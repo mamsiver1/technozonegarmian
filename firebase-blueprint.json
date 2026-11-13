@@ -1,0 +1,207 @@
+{
+  "entities": {
+    "Post": {
+      "title": "Post",
+      "description": "A public post published on Garmian Technology Zone by the site owner.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Document ID of the post."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 180,
+          "description": "Post headline in Kurdish or English."
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 450,
+          "description": "Short excerpt or deck shown on feed cards."
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 25000,
+          "description": "Full post body content."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["news", "article", "tutorial", "software", "media", "announcement"],
+          "description": "Content type category."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["published", "draft"],
+          "description": "Publication visibility status."
+        },
+        "featured": {
+          "type": "boolean",
+          "description": "Whether the post is pinned as a featured story."
+        },
+        "coverImage": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 550000,
+          "description": "Optional compressed data URL or HTTPS image URL for the post cover."
+        },
+        "externalUrl": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1000,
+          "description": "Optional download, video, or reference URL."
+        },
+        "codeSnippet": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 12000,
+          "description": "Optional code or command block for technical tutorials."
+        },
+        "fileMeta": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160,
+          "description": "Optional version, platform, or file info (e.g., v2.4 · Windows / Android)."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Up to 6 short topic tags."
+        },
+        "authorUid": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Firebase Auth UID of the owner who created the post."
+        },
+        "authorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Display name of the publisher."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last update timestamp."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "content",
+        "category",
+        "status",
+        "featured",
+        "authorUid",
+        "authorName",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PostMedia": {
+      "title": "PostMedia",
+      "description": "Additional gallery image attached to a post.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "postId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "imageUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 550000
+        },
+        "caption": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 200
+        },
+        "orderIndex": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["published", "draft"]
+        },
+        "authorUid": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "postId",
+        "imageUrl",
+        "orderIndex",
+        "status",
+        "authorUid",
+        "createdAt"
+      ]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Explicit admin allowlist entry keyed by UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120
+        }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/posts/{postId}": {
+      "schema": {
+        "$ref": "#/entities/Post"
+      },
+      "description": "Publicly readable posts created and managed exclusively by the site owner."
+    },
+    "/posts/{postId}/gallery/{mediaId}": {
+      "schema": {
+        "$ref": "#/entities/PostMedia"
+      },
+      "description": "Optional additional gallery images belonging to a post."
+    },
+    "/admins/{uid}": {
+      "schema": {
+        "$ref": "#/entities/AdminUser"
+      },
+      "description": "Protected admin allowlist documents."
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "زۆنی تەکنەلۆژیای گەرمیان — Garmian Technology Zone",
+  "description": "پلاتفۆرمی فەرمی زۆنی تەکنەلۆژیای گەرمیان بۆ هەموو جۆرە پۆستێکی تەکنەلۆژی، هەواڵ، فێرکاری، بەرنامە و میدیا. دروستکراوە لەلایەن Siver IT.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

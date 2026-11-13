@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default-deny all paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Public single-document connection health check (no list, no write, no PII)
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // --- Global Hardened Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedOwner() {
+      return isVerifiedUser() && request.auth.token.email == 'chataisiver12@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedOwner() || (isVerifiedUser() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    // --- Validation Blueprints ---
+    function isValidPost(data) {
+      return data.keys().hasAll([
+          'id', 'title', 'content', 'category', 'status',
+          'featured', 'authorUid', 'authorName', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'title', 'summary', 'content', 'category', 'status',
+          'featured', 'coverImage', 'externalUrl', 'codeSnippet',
+          'fileMeta', 'tags', 'authorUid', 'authorName', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.authorUid == request.auth.uid
+        && isValidId(data.authorUid)
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 180
+        && (!('summary' in data) || (data.summary is string && data.summary.size() <= 450))
+        && data.content is string && data.content.size() >= 1 && data.content.size() <= 25000
+        && data.category in ['news', 'article', 'tutorial', 'software', 'media', 'announcement']
+        && data.status in ['published', 'draft']
+        && data.featured is bool
+        && (!('coverImage' in data) || (data.coverImage is string && data.coverImage.size() <= 550000))
+        && (!('externalUrl' in data) || (data.externalUrl is string && data.externalUrl.size() <= 1000))
+        && (!('codeSnippet' in data) || (data.codeSnippet is string && data.codeSnippet.size() <= 12000))
+        && (!('fileMeta' in data) || (data.fileMeta is string && data.fileMeta.size() <= 160))
+        && (!('tags' in data) || (data.tags is list && data.tags.size() <= 6 && (data.tags.size() == 0 || (data.tags[0] is string && data.tags[0].size() <= 40))))
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPostMedia(data) {
+      return data.keys().hasAll([
+          'id', 'postId', 'imageUrl', 'orderIndex', 'status', 'authorUid', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'postId', 'imageUrl', 'caption', 'orderIndex', 'status', 'authorUid', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.postId)
+        && data.authorUid == request.auth.uid
+        && isValidId(data.authorUid)
+        && data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 550000
+        && (!('caption' in data) || (data.caption is string && data.caption.size() <= 200))
+        && data.orderIndex is number && data.orderIndex >= 0 && data.orderIndex <= 50
+        && data.status in ['published', 'draft']
+        && data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+    match /posts/{postId} {
+      allow get: if isValidId(postId) && (existing().status == 'published' || isAdmin());
+      allow list: if resource.data.status == 'published' || isBootstrappedOwner();
+
+      allow create: if isAdmin()
+        && isValidId(postId)
+        && isValidPost(incoming())
+        && incoming().id == postId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isAdmin()
+        && isValidId(postId)
+        && isValidPost(incoming())
+        && incoming().id == existing().id
+        && incoming().authorUid == existing().authorUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'summary', 'content', 'category', 'status',
+            'featured', 'coverImage', 'externalUrl', 'codeSnippet',
+            'fileMeta', 'tags', 'authorName', 'updatedAt'
+          ])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['featured', 'status', 'updatedAt'])
+        );
+
+      allow delete: if isAdmin() && isValidId(postId);
+
+      match /gallery/{mediaId} {
+        allow get: if isValidId(postId) && isValidId(mediaId) && (existing().status == 'published' || isAdmin());
+        allow list: if resource.data.status == 'published' || isBootstrappedOwner();
+
+        allow create: if isAdmin()
+          && isValidId(postId)
+          && isValidId(mediaId)
+          && isValidPostMedia(incoming())
+          && incoming().id == mediaId
+          && incoming().postId == postId
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/posts/$(postId))
+          && get(/databases/$(database)/documents/posts/$(postId)).data.authorUid == request.auth.uid;
+
+        allow update: if isAdmin()
+          && isValidId(postId)
+          && isValidId(mediaId)
+          && isValidPostMedia(incoming())
+          && incoming().id == existing().id
+          && incoming().postId == existing().postId
+          && incoming().authorUid == existing().authorUid
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['caption', 'orderIndex', 'status'])
+          && exists(/databases/$(database)/documents/posts/$(postId));
+
+        allow delete: if isAdmin() && isValidId(postId) && isValidId(mediaId);
+      }
+    }
+
+    match /admins/{uid} {
+      allow get: if isSignedIn() && isValidId(uid) && request.auth.uid == uid;
+      allow list: if false;
+      allow write: if false;
+    }
+  }
+}
